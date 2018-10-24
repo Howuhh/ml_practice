@@ -1,0 +1,5 @@
+# code
+__pycache__/
+
+# os
+.DS_Store
