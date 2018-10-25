@@ -25,9 +25,10 @@ class Node():
 
 class DecisionTree(BaseEstimator):
     """simple recursive implementation of decision tree for 3 ODS's hw"""
-    def __init__(self, criterion="gini", debug=False, max_depth=None, min_samples_split=10):
+    def __init__(self, criterion="gini", debug=False, max_depth=None, min_samples_split=10, max_features=None):
         self.node = None 
-        self.max_depth = None
+        self.max_depth = max_depth
+        self.max_features = max_features
         self.min_samples_split = min_samples_split
         self.criterion = criterion
         self.debug = debug
@@ -36,8 +37,10 @@ class DecisionTree(BaseEstimator):
         """find all possible threshold values by given column"""
         all_thresholds = np.empty(len(column) - 1)
 
-        for index in range(len(column) - 1):
-            threshold = (column[index] + column[index + 1]) / 2
+        # TODO: for sorted unique values from column!!
+        all_values = np.unique(column)
+        for index in range(len(all_values) - 1):
+            threshold = (all_values[index] + all_values[index + 1]) / 2
             all_thresholds[index] = threshold
 
         return all_thresholds
@@ -49,6 +52,9 @@ class DecisionTree(BaseEstimator):
         assert isinstance(y, np.ndarray), "y must be ndarray type"
 
         max_gain, column_idx, threshold = None, None, None
+
+
+        # TODO: shuffle columns order in each split + add random state
 
         for col_idx in range(X.shape[1]):
             # get column and all thresholds for it
@@ -74,6 +80,8 @@ class DecisionTree(BaseEstimator):
 
     def fit(self, X, y):
         """fit tree in X, y"""
+        # TODO: колво фичей если Ноне, макс глубина если ноне
+
         try:
             # only for numpy arrays for now
             if not isinstance(X, np.ndarray):
@@ -109,10 +117,27 @@ class DecisionTree(BaseEstimator):
                 print("Prediction: ", self.node.node_prediction)
             return self
 
+    def _predict_by_row(self, row):
+        # is it a slow way??
+        # TODO: implement predictions by row??
+        if not self.node.is_last: 
+            pass
+        return self.node.node_prediction
+
     def predict(self, X):
         """make predictons for given data"""
+        assert isinstance(X, np.ndarray), "X must be numpy array"      
+        # O(?)
+        n_rows, _ = X.shape
+        predictions = np.empty(n_rows)
 
-        # TODO: implement predictions by row??
+        for row in range(n_rows):
+            row_pred = self._predict_by_row(X[row, :])
+            predictions[row] = row_pred
+        
+        return predictions
+
+    def predict_proba(self, X):
         pass
 
 if __name__ == "__main__":
