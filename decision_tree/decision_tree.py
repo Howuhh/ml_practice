@@ -1,3 +1,4 @@
+# assert statement is all you need :p
 import random
 import numbers
 
