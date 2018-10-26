@@ -1,3 +1,6 @@
+import random
+import numbers
+
 import numpy as np
 import pandas as pd
 
@@ -18,6 +21,7 @@ class Node():
         
         self.gain = gain
         self.node_prediction = None 
+        self.node_prob_prediction = None
     
     @property
     def is_last(self):
@@ -25,19 +29,19 @@ class Node():
 
 class DecisionTree(BaseEstimator):
     """simple recursive implementation of decision tree for 3 ODS's hw"""
-    def __init__(self, criterion="gini", debug=False, max_depth=None, min_samples_split=10, max_features=None):
+    def __init__(self, criterion="gini", debug=False, max_depth=None, min_samples_split=10, max_features=None, random_state=None):
         self.node = None 
         self.max_depth = max_depth
         self.max_features = max_features
         self.min_samples_split = min_samples_split
         self.criterion = criterion
         self.debug = debug
+        self.random_state = random_state
        
     def _find_all_splits(self, column):
         """find all possible threshold values by given column"""
         all_thresholds = np.empty(len(column) - 1)
 
-        # TODO: for sorted unique values from column!!
         all_values = np.unique(column)
         for index in range(len(all_values) - 1):
             threshold = (all_values[index] + all_values[index + 1]) / 2
@@ -50,13 +54,31 @@ class DecisionTree(BaseEstimator):
 
         assert isinstance(X, np.ndarray), "X must be ndarray type"
         assert isinstance(y, np.ndarray), "y must be ndarray type"
+        
+        if not (self.max_features is None):
+            assert isinstance(self.max_features, numbers.Complex), "max features must be a number" 
 
+            assert self.max_features > 0, "max features must be > 0.0"
+            assert self.max_features <= X.shape[1], "max fearues must be <= X columns"
+        
+        # sample features for split + set seed
+        if (self.max_features is None):
+            self.max_features = X.shape[1]
+        else:
+            self.max_features = round(self.max_features)
+                 
+        if self.random_state is None:
+            self.random_state = random.uniform(1, 2*32) 
+
+        assert isinstance(self.random_state, numbers.Complex)
+        
+        random.seed(self.random_state)
+        column_order = random.sample(range(0, X.shape[1]), self.max_features)
+       
+        # node attributes
         max_gain, column_idx, threshold = None, None, None
 
-
-        # TODO: shuffle columns order in each split + add random state
-
-        for col_idx in range(X.shape[1]):
+        for col_idx in column_order:
             # get column and all thresholds for it
             column = X[:, col_idx]
             all_thresholds = self._find_all_splits(column)
@@ -77,10 +99,12 @@ class DecisionTree(BaseEstimator):
         else:
             assert y.shape[0] > 0, "y is 0 len"
             self.node.node_prediction = np.bincount(y).argmax()
+            self.node.node_prob_prediction = np.unique(y, return_counts=True)[1] / float(y.shape[0])
+
 
     def fit(self, X, y):
         """fit tree in X, y"""
-        # TODO: колво фичей если Ноне, макс глубина если ноне
+        # TODO: implement split by feature fraction
 
         try:
             # only for numpy arrays for now
@@ -89,12 +113,12 @@ class DecisionTree(BaseEstimator):
             if not isinstance(y, np.ndarray):
                 y = np.array(y)
 
+            assert y.shape[0] > 0, "y is wrong"
             if self.max_depth is None:
                 # The absolute maximum depth would be N−1, where N is the number of training samples. 
                 # https://stats.stackexchange.com/questions/65893/maximal-depth-of-a-decision-tree
-                self.max_depth = X.shape[0] - 1    
-
-            assert y.shape[0] > 0, "y is wrong"
+                self.max_depth = X.shape[0] - 1 
+            
 
             assert (X.shape[0] > self.min_samples_split)
             if not (self.max_depth is None):
@@ -120,19 +144,23 @@ class DecisionTree(BaseEstimator):
                 print("Data shapes: ", X.shape, y.shape)
                 print("Y: ", y)
                 print("Prediction: ", self.node.node_prediction)
+                print("Predict proba: ", self.node.node_prob_prediction)
             return self
 
-    def _predict_by_row(self, row):
+    def _predict_by_row(self, row, prob=False):
         assert row.shape[0] > 0, "empty row"
         # is it a slow way??
-        # why return?
 
         if not self.node.is_last: 
             if row[self.node.feature_idx] < self.node.threshold:
                 return self.node.left._predict_by_row(row)
             else:
                 return self.node.right._predict_by_row(row)
+        
+        if prob:
+            return self.node.node_prob_prediction  
         return self.node.node_prediction
+
     def predict(self, X):
         """make predictons for given data"""
         assert isinstance(X, np.ndarray), "X must be numpy array"      
@@ -145,4 +173,12 @@ class DecisionTree(BaseEstimator):
         return predictions
 
     def predict_proba(self, X):
-        pass
+        # TODO: incorrect return format, should be array [n_clasess] x 1, zero if class not in leaf
+        assert isinstance(X, np.ndarray), "X must be numpy array"      
+        n_rows, _ = X.shape
+        predictions = np.empty(n_rows)
+
+        for row in range(n_rows):
+            row_pred = self._predict_by_row(X[row, :], prob=True)
+            predictions[row] = row_pred
+        return predictions

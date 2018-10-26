@@ -7,7 +7,7 @@ def main(debug=False):
     data = load_breast_cancer()
     X, y = data["data"], data["target"]
 
-    clf = DecisionTree(debug=debug, max_depth=2)
+    clf = DecisionTree(debug=debug, max_depth=10)
 
     print(X.shape, y.shape)
 
@@ -18,4 +18,4 @@ def main(debug=False):
     print(accuracy_score(y, y_pred))
 
 if __name__ == "__main__":
-    main()
+    main(debug=True)
