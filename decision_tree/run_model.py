@@ -18,4 +18,4 @@ def main(debug=False):
     print(accuracy_score(y, y_pred))
 
 if __name__ == "__main__":
-    main(debug=True)
+    main(debug=False)

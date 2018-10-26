@@ -38,6 +38,7 @@ class DecisionTree(BaseEstimator):
         self.criterion = criterion
         self.debug = debug
         self.random_state = random_state
+        self.x_columns = None
        
     def _find_all_splits(self, column):
         """find all possible threshold values by given column"""
@@ -74,12 +75,15 @@ class DecisionTree(BaseEstimator):
         assert isinstance(self.random_state, numbers.Complex)
         
         random.seed(self.random_state)
-        column_order = random.sample(range(0, X.shape[1]), self.max_features)
+        # TODO: is this right? in an ordinary tree, features are selected once!
+        # if base class for random forest -> select features for every split
+        if self.x_columns is None:
+            self.x_columns = random.sample(range(0, X.shape[1]), self.max_features)
        
         # node attributes
         max_gain, column_idx, threshold = None, None, None
 
-        for col_idx in column_order:
+        for col_idx in self.x_columns:
             # get column and all thresholds for it
             column = X[:, col_idx]
             all_thresholds = self._find_all_splits(column)
@@ -100,13 +104,13 @@ class DecisionTree(BaseEstimator):
         else:
             assert y.shape[0] > 0, "y is 0 len"
             self.node.node_prediction = np.bincount(y).argmax()
+
+            # TODO: zero if not in this leaf
             self.node.node_prob_prediction = np.unique(y, return_counts=True)[1] / float(y.shape[0])
 
 
     def fit(self, X, y):
         """fit tree in X, y"""
-        # TODO: implement split by feature fraction
-
         try:
             # only for numpy arrays for now
             if not isinstance(X, np.ndarray):
@@ -132,9 +136,14 @@ class DecisionTree(BaseEstimator):
 
             # build left and right child for max
             self.node.left = DecisionTree(criterion=self.criterion, debug=self.debug, max_depth=self.max_depth - 1)
+            # if base class for random forest -> remove that attribute
+            self.node.left.x_columns = self.x_columns
             self.node.left.fit(X_left, y_left)
+            
 
             self.node.right = DecisionTree(criterion=self.criterion, debug=self.debug, max_depth=self.max_depth - 1)
+            # if base class for random forest -> remove that attribute
+            self.node.right.x_columns = self.x_columns
             self.node.right.fit(X_right, y_right)
         except AssertionError:
             self.node = Node()
