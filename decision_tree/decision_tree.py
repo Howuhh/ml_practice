@@ -89,6 +89,11 @@ class DecisionTree(BaseEstimator):
             if not isinstance(y, np.ndarray):
                 y = np.array(y)
 
+            if self.max_depth is None:
+                # The absolute maximum depth would be N−1, where N is the number of training samples. 
+                # https://stats.stackexchange.com/questions/65893/maximal-depth-of-a-decision-tree
+                self.max_depth = X.shape[0] - 1    
+
             assert y.shape[0] > 0, "y is wrong"
 
             assert (X.shape[0] > self.min_samples_split)
@@ -101,10 +106,10 @@ class DecisionTree(BaseEstimator):
             self.node = Node(feature_idx=column_idx, threshold=threshold, labels=y, gain=gain)
 
             # build left and right child for max
-            self.node.left = DecisionTree(criterion=self.criterion, debug=self.debug)
+            self.node.left = DecisionTree(criterion=self.criterion, debug=self.debug, max_depth=self.max_depth - 1)
             self.node.left.fit(X_left, y_left)
 
-            self.node.right = DecisionTree(criterion=self.criterion, debug=self.debug)
+            self.node.right = DecisionTree(criterion=self.criterion, debug=self.debug, max_depth=self.max_depth - 1)
             self.node.right.fit(X_right, y_right)
         except AssertionError:
             self.node = Node()
@@ -118,34 +123,26 @@ class DecisionTree(BaseEstimator):
             return self
 
     def _predict_by_row(self, row):
+        assert row.shape[0] > 0, "empty row"
         # is it a slow way??
-        # TODO: implement predictions by row??
-        if not self.node.is_last: 
-            pass
-        return self.node.node_prediction
+        # why return?
 
+        if not self.node.is_last: 
+            if row[self.node.feature_idx] < self.node.threshold:
+                return self.node.left._predict_by_row(row)
+            else:
+                return self.node.right._predict_by_row(row)
+        return self.node.node_prediction
     def predict(self, X):
         """make predictons for given data"""
         assert isinstance(X, np.ndarray), "X must be numpy array"      
-        # O(?)
         n_rows, _ = X.shape
         predictions = np.empty(n_rows)
 
         for row in range(n_rows):
             row_pred = self._predict_by_row(X[row, :])
             predictions[row] = row_pred
-        
         return predictions
 
     def predict_proba(self, X):
         pass
-
-if __name__ == "__main__":
-    from sklearn.datasets import load_iris
-    data = load_iris()
-    X, y = data["data"], data["target"]
-
-    clf = DecisionTree(debug=True)
-
-    print("Calling fit method!")
-    clf.fit(X, y)
