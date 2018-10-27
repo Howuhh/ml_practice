@@ -39,6 +39,7 @@ class DecisionTree(BaseEstimator):
         self.debug = debug
         self.random_state = random_state
         self.x_columns = None
+        self.n_clasess = None
        
     def _find_all_splits(self, column):
         """find all possible threshold values by given column"""
@@ -97,6 +98,17 @@ class DecisionTree(BaseEstimator):
         
         return max_gain, column_idx, threshold 
 
+    def _predict_prob_from_leaf(self, y):
+        # classes should be sorted and labeled from 0 to N! yeah, not very realistic, but...
+        class_prob = np.zeros(self.n_clasess)
+        classes_from_leaf = np.unique(y, return_counts=True)
+
+        # for all unique classes in leaf
+        for cls_index, class_ in enumerate(classes_from_leaf[0]):
+            # get class fraction
+            class_prob[class_] = classes_from_leaf[1][cls_index] / float(y.shape[0])      
+        return class_prob
+
     def _predict_from_leaf(self, y):
         """make final prediction for leaf"""
         if (self.criterion == "variance") or (self.criterion == "mad_median"):
@@ -106,11 +118,13 @@ class DecisionTree(BaseEstimator):
             self.node.node_prediction = np.bincount(y).argmax()
 
             # TODO: zero if not in this leaf
-            self.node.node_prob_prediction = np.unique(y, return_counts=True)[1] / float(y.shape[0])
+            self.node.node_prob_prediction = self._predict_prob_from_leaf(y)
 
 
     def fit(self, X, y):
         """fit tree in X, y"""
+
+        # TODO: add n_classes attribute
         try:
             # only for numpy arrays for now
             if not isinstance(X, np.ndarray):
@@ -118,12 +132,12 @@ class DecisionTree(BaseEstimator):
             if not isinstance(y, np.ndarray):
                 y = np.array(y)
 
-            assert y.shape[0] > 0, "y is wrong"
             if self.max_depth is None:
                 # The absolute maximum depth would be N−1, where N is the number of training samples. 
                 # https://stats.stackexchange.com/questions/65893/maximal-depth-of-a-decision-tree
                 self.max_depth = X.shape[0] - 1 
-            
+            if self.n_clasess is None:
+                self.n_clasess = len(set(y))
 
             assert (X.shape[0] > self.min_samples_split)
             if not (self.max_depth is None):
@@ -138,13 +152,16 @@ class DecisionTree(BaseEstimator):
             self.node.left = DecisionTree(criterion=self.criterion, debug=self.debug, max_depth=self.max_depth - 1)
             # if base class for random forest -> remove that attribute
             self.node.left.x_columns = self.x_columns
+            self.node.left.n_clasess = self.n_clasess
             self.node.left.fit(X_left, y_left)
             
 
             self.node.right = DecisionTree(criterion=self.criterion, debug=self.debug, max_depth=self.max_depth - 1)
             # if base class for random forest -> remove that attribute
             self.node.right.x_columns = self.x_columns
+            self.node.right.n_clasess = self.n_clasess
             self.node.right.fit(X_right, y_right)
+        # not the best idea, it is impossible to check for other conditions with assert :(
         except AssertionError:
             self.node = Node()
             self._predict_from_leaf(y)
@@ -163,9 +180,9 @@ class DecisionTree(BaseEstimator):
 
         if not self.node.is_last: 
             if row[self.node.feature_idx] < self.node.threshold:
-                return self.node.left._predict_by_row(row)
+                return self.node.left._predict_by_row(row, prob)
             else:
-                return self.node.right._predict_by_row(row)
+                return self.node.right._predict_by_row(row, prob)
         
         if prob:
             return self.node.node_prob_prediction  
@@ -186,9 +203,11 @@ class DecisionTree(BaseEstimator):
         # TODO: incorrect return format, should be array [n_clasess] x 1, zero if class not in leaf
         assert isinstance(X, np.ndarray), "X must be numpy array"      
         n_rows, _ = X.shape
-        predictions = np.empty(n_rows)
-
+        # predictions = np.empty(n_rows, 2)
+        predictions = []
         for row in range(n_rows):
             row_pred = self._predict_by_row(X[row, :], prob=True)
-            predictions[row] = row_pred
-        return predictions
+            print(row_pred)
+            predictions.append(row_pred)
+            # predictions[row] = row_pred
+        return np.array(predictions)
