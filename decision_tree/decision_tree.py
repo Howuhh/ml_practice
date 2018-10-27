@@ -123,8 +123,6 @@ class DecisionTree(BaseEstimator):
 
     def fit(self, X, y):
         """fit tree in X, y"""
-
-        # TODO: add n_classes attribute
         try:
             # only for numpy arrays for now
             if not isinstance(X, np.ndarray):
@@ -200,14 +198,14 @@ class DecisionTree(BaseEstimator):
         return predictions
 
     def predict_proba(self, X):
-        # TODO: incorrect return format, should be array [n_clasess] x 1, zero if class not in leaf
         assert isinstance(X, np.ndarray), "X must be numpy array"      
+        
         n_rows, _ = X.shape
-        # predictions = np.empty(n_rows, 2)
+        
         predictions = []
+        
         for row in range(n_rows):
             row_pred = self._predict_by_row(X[row, :], prob=True)
-            print(row_pred)
             predictions.append(row_pred)
-            # predictions[row] = row_pred
+        
         return np.array(predictions)
